@@ -48,3 +48,7 @@ Many thanks to [Haobin Ni](https://haobin.cx/) and [Hongbo Zhang](https://www.cs
 Many thanks to [Brandon Fusi](https://www.linkedin.com/in/brandon-cheo-fusi-b94b1a171/) for [porting egos-2000 to Allwinner D1](https://github.com/cheofusi/egos-2000-d1) and Sipeed's [Lichee RV64 Nezha compute module](https://wiki.sipeed.com/hardware/en/lichee/RV/RV.html).
 
 For any questions, please contact [Yunhao Zhang](https://dolobyte.net/).
+
+
+PANCHOLI IS PRIMED
+
