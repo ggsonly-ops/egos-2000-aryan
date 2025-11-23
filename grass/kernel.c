@@ -75,14 +75,14 @@ static void intr_entry(uint id) {
     /* Update the process lifecycle statistics. */
     ulonglong current_time = mtime_get();
     
-    if (curr_proc_idx > 0 && curr_proc_idx <= MAX_NPROCESS) {
+    if (curr_proc_idx >= 1 && curr_proc_idx <= MAX_NPROCESS) {
         struct process* p = &proc_set[curr_proc_idx];
         
-        /* Increment timer interrupts */
+        /* Increment timer interrupts - this interrupt belongs to current process */
         p->num_timer_interrupts++;
         
         /* Calculate runtime since last schedule */
-        if (p->last_schedule_time > 0) {
+        if (p->last_schedule_time > 0 && p->last_schedule_time < current_time) {
             ulonglong runtime = current_time - p->last_schedule_time;
             p->cpu_time += runtime;
             mlfq_update_level(p, runtime);
@@ -92,7 +92,6 @@ static void intr_entry(uint id) {
     /* Student's code ends here. */
     proc_yield();
 }
-
 static void proc_yield() {
     if (curr_status == PROC_RUNNING) proc_set_runnable(curr_pid);
 
@@ -108,23 +107,19 @@ static void proc_yield() {
     mlfq_reset_level();
 
     int next_idx = MAX_NPROCESS;
-    
-    /* First pass: Try pending syscalls */
-    for (uint i = 1; i <= MAX_NPROCESS; i++) {
-        struct process* p = &proc_set[(curr_proc_idx + i) % MAX_NPROCESS];
-        if (p->status == PROC_PENDING_SYSCALL) proc_try_syscall(p);
-    }
-    
-    /* Second pass: Find process with highest priority (lowest level number) using MLFQ Rule 1 */
     int lowest_level = MLFQ_NLEVELS;
+    
     for (uint i = 1; i <= MAX_NPROCESS; i++) {
-        struct process* p = &proc_set[(curr_proc_idx + i) % MAX_NPROCESS];
+        int idx = ((curr_proc_idx - 1 + i) % MAX_NPROCESS) + 1;
+        struct process* p = &proc_set[idx];
         
+        if (p->status == PROC_PENDING_SYSCALL) proc_try_syscall(p);
+
         if (p->status == PROC_READY || p->status == PROC_RUNNABLE) {
             /* Rule 1: Choose process with lowest level (highest priority) */
             if ((int)p->queue_level < lowest_level) {
                 lowest_level = p->queue_level;
-                next_idx = (curr_proc_idx + i) % MAX_NPROCESS;
+                next_idx = idx;
             }
         }
     }
@@ -144,7 +139,7 @@ static void proc_yield() {
             next_proc->response_time = current_time - next_proc->creation_time;
         }
         
-        /* Always update last schedule time */
+        /* Update last schedule time */
         next_proc->last_schedule_time = current_time;
 
     } else {
@@ -167,9 +162,12 @@ static void proc_yield() {
         curr_saved[0]                = APPS_ARG;
         curr_saved[1]                = APPS_ARG + 4;
         proc_set[curr_proc_idx].mepc = APPS_ENTRY;
-        proc_set[curr_proc_idx].last_schedule_time = mtime_get();
     }
     proc_set_running(curr_pid);
+    
+    /* Update last_schedule_time whenever we schedule a process */
+    proc_set[curr_proc_idx].last_schedule_time = mtime_get();
+    
     earth->timer_reset(core_in_kernel);
 }
 

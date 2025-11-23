@@ -3,8 +3,9 @@
 extern struct process proc_set[MAX_NPROCESS + 1];
 
 static void proc_set_status(int pid, enum proc_status status) {
-    for (uint i = 0; i < MAX_NPROCESS; i++)
-        if (proc_set[i].pid == pid) proc_set[i].status = status;
+    for (uint i = 1; i <= MAX_NPROCESS; i++)
+        if (proc_set[i].pid == pid)
+            proc_set[i].status = status;
 }
 
 void proc_set_ready(int pid) { proc_set_status(pid, PROC_READY); }
@@ -40,7 +41,6 @@ int proc_alloc() {
 
     FATAL("proc_alloc: reach the limit of %d processes", MAX_NPROCESS);
 }
-
 void proc_free(int pid) {
     /* Student's code goes here (Preemptive Scheduler). */
 
@@ -49,6 +49,13 @@ void proc_free(int pid) {
         for (uint i = 1; i <= MAX_NPROCESS; i++) {
             if (proc_set[i].pid == pid && proc_set[i].status != PROC_UNUSED) {
                 ulonglong current_time = mtime_get();
+                
+                /* Add any remaining CPU time if process is currently running */
+                if (proc_set[i].last_schedule_time > 0 && proc_set[i].last_schedule_time < current_time) {
+                    ulonglong remaining_runtime = current_time - proc_set[i].last_schedule_time;
+                    proc_set[i].cpu_time += remaining_runtime;
+                }
+                
                 proc_set[i].turnaround_time = current_time - proc_set[i].creation_time;
                 
                 INFO("Process %d terminated:", pid);
@@ -65,10 +72,18 @@ void proc_free(int pid) {
     } else {
         /* Free all user processes. */
         INFO("Terminating all user processes:");
+        ulonglong current_time = mtime_get();
+        
         for (uint i = 1; i <= MAX_NPROCESS; i++) {
             if (proc_set[i].pid >= GPID_USER_START &&
                 proc_set[i].status != PROC_UNUSED) {
-                ulonglong current_time = mtime_get();
+                
+                /* Add any remaining CPU time if process is currently running */
+                if (proc_set[i].last_schedule_time > 0 && proc_set[i].last_schedule_time < current_time) {
+                    ulonglong remaining_runtime = current_time - proc_set[i].last_schedule_time;
+                    proc_set[i].cpu_time += remaining_runtime;
+                }
+                
                 proc_set[i].turnaround_time = current_time - proc_set[i].creation_time;
                 
                 INFO("Process %d:", proc_set[i].pid);
