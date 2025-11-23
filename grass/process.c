@@ -44,7 +44,7 @@ int proc_alloc() {
 void proc_free(int pid) {
     /* Student's code goes here (Preemptive Scheduler). */
 
-    
+    /* Print the lifecycle statistics of the terminated process or processes. */
     if (pid != GPID_ALL) {
         for (uint i = 1; i <= MAX_NPROCESS; i++) {
             if (proc_set[i].pid == pid && proc_set[i].status != PROC_UNUSED) {
