@@ -1,0 +1,10 @@
+Line 1 with egos
+Line 2 with 2000
+Line 3 with pattern
+Line 4 with grep
+Line 5 with wcl
+Line 6 is simple
+Line 7 has more
+Line 8 continues
+Line 9 almost done
+Line 10 final line

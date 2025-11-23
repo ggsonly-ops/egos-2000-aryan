@@ -6,9 +6,9 @@
 #include "app.h"
 #include <string.h>
 
-#define LINE_BUF_SIZE 1024   /* big enough for README line */
+#define LINE_BUF_SIZE 1024
 
-/* Return 1 if line[0..line_len-1] contains pattern[0..pat_len-1], else 0. */
+/* Return 1 if line contains pattern, else 0 */
 static int contains_pattern(const char *line, int line_len,
                             const char *pattern, int pat_len) {
     if (pat_len == 0) return 1;
@@ -24,6 +24,30 @@ static int contains_pattern(const char *line, int line_len,
         }
     }
     return 0;
+}
+
+/* Process buffer and print matching lines */
+static void process_buffer(char *buf, char *line, int *line_len, 
+                          const char *pattern, int pat_len) {
+    for (int i = 0; i < BLOCK_SIZE && buf[i] != '\0'; i++) {
+        char c = buf[i];
+
+        if (c == '\n') {
+            /* End of line */
+            if (*line_len >= LINE_BUF_SIZE)
+                *line_len = LINE_BUF_SIZE - 1;
+
+            line[*line_len] = '\0';
+
+            if (contains_pattern(line, *line_len, pattern, pat_len))
+                printf("%s\n", line);
+
+            *line_len = 0;
+        } else {
+            if (*line_len < LINE_BUF_SIZE - 1)
+                line[(*line_len)++] = c;
+        }
+    }
 }
 
 int main(int argc, char **argv) {
@@ -42,35 +66,49 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    /* Same as cat: read once, ignore return, treat buffer as a string. */
+    /* Read entire file block by block */
     char buf[BLOCK_SIZE];
-    file_read(file_ino, 0, buf);
-
-    /* Walk through buf, split into lines, and match each line. */
     char line[LINE_BUF_SIZE];
     int line_len = 0;
+    int offset = 0;
 
-    for (int i = 0;; i++) {
-        char c = buf[i];
-
-        if (c == '\0' || c == '\n') {
-            /* end of line or end of file */
-            if (line_len >= LINE_BUF_SIZE)
-                line_len = LINE_BUF_SIZE - 1;
-
-            line[line_len] = '\0';
-
-            if (contains_pattern(line, line_len, pattern, pat_len))
-                printf("%s\n", line);
-
-            line_len = 0;
-
-            if (c == '\0')
-                break;
-        } else {
-            if (line_len < LINE_BUF_SIZE - 1)
-                line[line_len++] = c;
+    while (1) {
+        /* Clear buffer before reading */
+        for (int i = 0; i < BLOCK_SIZE; i++) {
+            buf[i] = '\0';
         }
+        
+        file_read(file_ino, offset, buf);
+        
+        /* Check if this block is empty (end of file) */
+        if (buf[0] == '\0') {
+            break;
+        }
+        
+        /* Process this block */
+        process_buffer(buf, line, &line_len, pattern, pat_len);
+        
+        /* Check if we read a partial block (indicates end of file) */
+        int partial_block = 0;
+        for (int i = 0; i < BLOCK_SIZE; i++) {
+            if (buf[i] == '\0') {
+                partial_block = 1;
+                break;
+            }
+        }
+        
+        if (partial_block) {
+            /* Handle last line if it doesn't end with newline */
+            if (line_len > 0) {
+                line[line_len] = '\0';
+                if (contains_pattern(line, line_len, pattern, pat_len))
+                    printf("%s\n", line);
+            }
+            break;
+        }
+        
+        /* Move to next block */
+        offset += BLOCK_SIZE;
     }
 
     return 0;
