@@ -5,8 +5,8 @@
 
 /* MLFQ Constants */
 #define MLFQ_NLEVELS          5
-#define MLFQ_RESET_PERIOD     10000000         /* 10 seconds */
-#define MLFQ_LEVEL_RUNTIME(x) ((x) + 1) * 100000 /* e.g., 100ms for level 0 */
+#define MLFQ_RESET_PERIOD     10000000       
+#define MLFQ_LEVEL_RUNTIME(x) ((x) + 1) * 100000 
 
 enum proc_status {
     PROC_UNUSED,

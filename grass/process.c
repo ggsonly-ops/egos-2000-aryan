@@ -103,8 +103,7 @@ void proc_free(int pid) {
 void mlfq_update_level(struct process* p, ulonglong runtime) {
     /* Student's code goes here (Preemptive Scheduler). */
 
-    /* Update the MLFQ-related fields in struct process* p after this
-     * process has run on the CPU for another runtime microseconds. */
+    
     
     /* Deduct the runtime from remaining runtime on current level */
     if (p->remaining_runtime > runtime) {

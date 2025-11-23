@@ -1,11 +1,4 @@
-/*
- * (C) 2025, Cornell University
- * All rights reserved.
- *
- * Description: kernel ≈ 2 handlers
- *   intr_entry() handles timer and device interrupts.
- *   excp_entry() handles system calls and faults (e.g., invalid memory access).
- */
+
 
 #include "process.h"
 #include <string.h>
@@ -97,12 +90,7 @@ static void proc_yield() {
 
     /* Student's code goes here (Multiple Projects). */
 
-    /* [Preemptive Scheduler]
-     * Measure and record lifecycle statistics for the *current* process.
-     * Modify the loop below to find the next process to schedule with MLFQ.
-     * [System Call & Protection]
-     * Do not schedule a process that should still be sleeping at this time. */
-
+    
     /* Check for MLFQ periodic reset */
     mlfq_reset_level();
 
@@ -125,10 +113,7 @@ static void proc_yield() {
     }
 
     if (next_idx < MAX_NPROCESS) {
-        /* [Preemptive Scheduler]
-         * Measure and record lifecycle statistics for the *next* process.
-         * [System Call & Protection | Multicore & Locks]
-         * Modify mstatus.MPP to enter machine or user mode after mret. */
+        
         
         ulonglong current_time = mtime_get();
         struct process* next_proc = &proc_set[next_idx];
@@ -143,12 +128,7 @@ static void proc_yield() {
         next_proc->last_schedule_time = current_time;
 
     } else {
-        /* [Multicore & Locks]
-         * Release the kernel lock.
-         * [Multicore & Locks | System Call & Protection]
-         * Set curr_proc_idx to 0; Reset the timer;
-         * Enable interrupts by setting the mstatus.MIE bit to 1;
-         * Wait for the next interrupt using the wfi instruction. */
+        
 
         FATAL("proc_yield: no process to run on core %d", core_in_kernel);
     }
