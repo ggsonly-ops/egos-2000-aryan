@@ -45,7 +45,9 @@ char* contents[]  = {
      "exception handling, preemptive scheduler, system call, file system, "
      "shell, an Ethernet/UDP demo, several user commands, and the mkfs tool. "
      "Moreover, the EGOS book (https://egos.fun) contains 9 course projects.",
-    bin_dir};
+     bin_dir
+    };
+
 #define BIN_DIR_INODE ((sizeof(contents) / sizeof(char*)) - 1)
 
 char inode[SIZE_2MB], tmp[512];
