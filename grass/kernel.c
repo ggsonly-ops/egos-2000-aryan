@@ -69,10 +69,25 @@ static void excp_entry(uint id) {
 }
 
 static void intr_entry(uint id) {
-    if (id != INTR_ID_TIMER) FATAL("excp_entry: kernel got interrupt %d", id);
+    if (id != INTR_ID_TIMER) FATAL("intr_entry: kernel got interrupt %d", id);
     /* Student's code goes here (Preemptive Scheduler). */
 
     /* Update the process lifecycle statistics. */
+    ulonglong current_time = mtime_get();
+    
+    if (curr_proc_idx > 0 && curr_proc_idx <= MAX_NPROCESS) {
+        struct process* p = &proc_set[curr_proc_idx];
+        
+        /* Increment timer interrupts */
+        p->num_timer_interrupts++;
+        
+        /* Calculate runtime since last schedule */
+        if (p->last_schedule_time > 0) {
+            ulonglong runtime = current_time - p->last_schedule_time;
+            p->cpu_time += runtime;
+            mlfq_update_level(p, runtime);
+        }
+    }
 
     /* Student's code ends here. */
     proc_yield();
@@ -89,14 +104,28 @@ static void proc_yield() {
      * [System Call & Protection]
      * Do not schedule a process that should still be sleeping at this time. */
 
+    /* Check for MLFQ periodic reset */
+    mlfq_reset_level();
+
     int next_idx = MAX_NPROCESS;
+    
+    /* First pass: Try pending syscalls */
     for (uint i = 1; i <= MAX_NPROCESS; i++) {
         struct process* p = &proc_set[(curr_proc_idx + i) % MAX_NPROCESS];
         if (p->status == PROC_PENDING_SYSCALL) proc_try_syscall(p);
-
+    }
+    
+    /* Second pass: Find process with highest priority (lowest level number) using MLFQ Rule 1 */
+    int lowest_level = MLFQ_NLEVELS;
+    for (uint i = 1; i <= MAX_NPROCESS; i++) {
+        struct process* p = &proc_set[(curr_proc_idx + i) % MAX_NPROCESS];
+        
         if (p->status == PROC_READY || p->status == PROC_RUNNABLE) {
-            next_idx = (curr_proc_idx + i) % MAX_NPROCESS;
-            break;
+            /* Rule 1: Choose process with lowest level (highest priority) */
+            if ((int)p->queue_level < lowest_level) {
+                lowest_level = p->queue_level;
+                next_idx = (curr_proc_idx + i) % MAX_NPROCESS;
+            }
         }
     }
 
@@ -105,6 +134,18 @@ static void proc_yield() {
          * Measure and record lifecycle statistics for the *next* process.
          * [System Call & Protection | Multicore & Locks]
          * Modify mstatus.MPP to enter machine or user mode after mret. */
+        
+        ulonglong current_time = mtime_get();
+        struct process* next_proc = &proc_set[next_idx];
+        
+        /* Record response time for first schedule */
+        if (next_proc->first_schedule_time == 0) {
+            next_proc->first_schedule_time = current_time;
+            next_proc->response_time = current_time - next_proc->creation_time;
+        }
+        
+        /* Always update last schedule time */
+        next_proc->last_schedule_time = current_time;
 
     } else {
         /* [Multicore & Locks]
@@ -126,6 +167,7 @@ static void proc_yield() {
         curr_saved[0]                = APPS_ARG;
         curr_saved[1]                = APPS_ARG + 4;
         proc_set[curr_proc_idx].mepc = APPS_ENTRY;
+        proc_set[curr_proc_idx].last_schedule_time = mtime_get();
     }
     proc_set_running(curr_pid);
     earth->timer_reset(core_in_kernel);

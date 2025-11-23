@@ -1,15 +1,5 @@
-/*
- * (C) 2025, Cornell University
- * All rights reserved.
- *
- * Description: helper functions for process management
- */
-
 #include "process.h"
 
-#define MLFQ_NLEVELS          5
-#define MLFQ_RESET_PERIOD     10000000         /* 10 seconds */
-#define MLFQ_LEVEL_RUNTIME(x) (x + 1) * 100000 /* e.g., 100ms for level 0 */
 extern struct process proc_set[MAX_NPROCESS + 1];
 
 static void proc_set_status(int pid, enum proc_status status) {
@@ -31,6 +21,18 @@ int proc_alloc() {
             /* Student's code goes here (Preemptive Scheduler | System Call). */
 
             /* Initialization of lifecycle statistics, MLFQ or process sleep. */
+            ulonglong current_time = mtime_get();
+            proc_set[i].creation_time = current_time;
+            proc_set[i].first_schedule_time = 0;
+            proc_set[i].last_schedule_time = 0;
+            proc_set[i].turnaround_time = 0;
+            proc_set[i].response_time = 0;
+            proc_set[i].cpu_time = 0;
+            proc_set[i].num_timer_interrupts = 0;
+            
+            /* MLFQ initialization - all processes start at level 0 (Rule 3) */
+            proc_set[i].queue_level = 0;
+            proc_set[i].remaining_runtime = MLFQ_LEVEL_RUNTIME(0);
 
             /* Student's code ends here. */
             return curr_pid;
@@ -44,16 +46,41 @@ void proc_free(int pid) {
 
     /* Print the lifecycle statistics of the terminated process or processes. */
     if (pid != GPID_ALL) {
-        earth->mmu_free(pid);
-        proc_set_status(pid, PROC_UNUSED);
+        for (uint i = 1; i <= MAX_NPROCESS; i++) {
+            if (proc_set[i].pid == pid && proc_set[i].status != PROC_UNUSED) {
+                ulonglong current_time = mtime_get();
+                proc_set[i].turnaround_time = current_time - proc_set[i].creation_time;
+                
+                INFO("Process %d terminated:", pid);
+                INFO("  Turnaround time: %d us", (int)proc_set[i].turnaround_time);
+                INFO("  Response time: %d us", (int)proc_set[i].response_time);
+                INFO("  CPU time: %d us", (int)proc_set[i].cpu_time);
+                INFO("  Timer interrupts: %d", (int)proc_set[i].num_timer_interrupts);
+                
+                earth->mmu_free(pid);
+                proc_set[i].status = PROC_UNUSED;
+                break;
+            }
+        }
     } else {
         /* Free all user processes. */
-        for (uint i = 0; i < MAX_NPROCESS; i++)
+        INFO("Terminating all user processes:");
+        for (uint i = 1; i <= MAX_NPROCESS; i++) {
             if (proc_set[i].pid >= GPID_USER_START &&
                 proc_set[i].status != PROC_UNUSED) {
+                ulonglong current_time = mtime_get();
+                proc_set[i].turnaround_time = current_time - proc_set[i].creation_time;
+                
+                INFO("Process %d:", proc_set[i].pid);
+                INFO("  Turnaround time: %d us", (int)proc_set[i].turnaround_time);
+                INFO("  Response time: %d us", (int)proc_set[i].response_time);
+                INFO("  CPU time: %d us", (int)proc_set[i].cpu_time);
+                INFO("  Timer interrupts: %d", (int)proc_set[i].num_timer_interrupts);
+                
                 earth->mmu_free(proc_set[i].pid);
                 proc_set[i].status = PROC_UNUSED;
             }
+        }
     }
     /* Student's code ends here. */
 }
@@ -63,18 +90,59 @@ void mlfq_update_level(struct process* p, ulonglong runtime) {
 
     /* Update the MLFQ-related fields in struct process* p after this
      * process has run on the CPU for another runtime microseconds. */
+    
+    /* Deduct the runtime from remaining runtime on current level */
+    if (p->remaining_runtime > runtime) {
+        p->remaining_runtime -= runtime;
+    } else {
+        p->remaining_runtime = 0;
+    }
+    
+    /* Rule 4: If a process uses up its time allotment at level i, 
+     * move it to level i+1 */
+    if (p->remaining_runtime == 0 && p->queue_level < (MLFQ_NLEVELS - 1)) {
+        p->queue_level++;
+        p->remaining_runtime = MLFQ_LEVEL_RUNTIME(p->queue_level);
+    } else if (p->remaining_runtime == 0 && p->queue_level == (MLFQ_NLEVELS - 1)) {
+        /* At lowest priority level, reset remaining runtime */
+        p->remaining_runtime = MLFQ_LEVEL_RUNTIME(p->queue_level);
+    }
 
     /* Student's code ends here. */
 }
 
 void mlfq_reset_level() {
     /* Student's code goes here (Preemptive Scheduler). */
+    
+    /* Rule 5: Reset the level of GPID_SHELL if there is pending keyboard input */
     if (!earth->tty_input_empty()) {
-        /* Reset the level of GPID_SHELL if there is pending keyboard input. */
+        for (uint i = 1; i <= MAX_NPROCESS; i++) {
+            if (proc_set[i].pid == GPID_SHELL && proc_set[i].status != PROC_UNUSED) {
+                proc_set[i].queue_level = 0;
+                proc_set[i].remaining_runtime = MLFQ_LEVEL_RUNTIME(0);
+                break;
+            }
+        }
     }
 
     static ulonglong MLFQ_last_reset_time = 0;
     /* Reset the level of all processes every MLFQ_RESET_PERIOD microseconds. */
+    ulonglong current_time = mtime_get();
+    
+    if (MLFQ_last_reset_time == 0) {
+        MLFQ_last_reset_time = current_time;
+    }
+    
+    /* Rule 5: Every 10 seconds, move all processes to level 0 */
+    if (current_time - MLFQ_last_reset_time >= MLFQ_RESET_PERIOD) {
+        for (uint i = 1; i <= MAX_NPROCESS; i++) {
+            if (proc_set[i].status != PROC_UNUSED) {
+                proc_set[i].queue_level = 0;
+                proc_set[i].remaining_runtime = MLFQ_LEVEL_RUNTIME(0);
+            }
+        }
+        MLFQ_last_reset_time = current_time;
+    }
 
     /* Student's code ends here. */
 }

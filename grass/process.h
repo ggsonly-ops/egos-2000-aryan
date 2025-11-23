@@ -3,6 +3,11 @@
 #include "egos.h"
 #include "syscall.h"
 
+/* MLFQ Constants */
+#define MLFQ_NLEVELS          5
+#define MLFQ_RESET_PERIOD     10000000         /* 10 seconds */
+#define MLFQ_LEVEL_RUNTIME(x) ((x) + 1) * 100000 /* e.g., 100ms for level 0 */
+
 enum proc_status {
     PROC_UNUSED,
     PROC_LOADING,
@@ -25,6 +30,21 @@ struct process {
     /* Student's code goes here (Preemptive Scheduler | System Call). */
 
     /* Add new fields for lifecycle statistics, MLFQ or process sleep. */
+    
+    /* Lifecycle data for the process */
+    ulonglong turnaround_time;     /* Time between creation and termination */
+    ulonglong response_time;       /* Time between creation and first schedule */
+    ulonglong cpu_time;            /* Accumulated time process actually ran on CPU */
+    ulonglong num_timer_interrupts; /* Number of timer interrupts encountered */
+    
+    /* Information necessary for MLFQ scheduling */
+    uint queue_level;              /* Current MLFQ queue level (0-4) */
+    ulonglong remaining_runtime;   /* Remaining runtime on current level */
+    
+    /* Timestamps for lifecycle tracking */
+    ulonglong creation_time;       /* When process was created */
+    ulonglong first_schedule_time; /* When process was first scheduled */
+    ulonglong last_schedule_time;  /* Last time process was scheduled */
 
     /* Student's code ends here. */
 };
