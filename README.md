@@ -1,3 +1,30 @@
+# egos-2000: MLFQ scheduler and user tools (my fork)
+
+This is my fork of [egos-2000](https://github.com/yhzhang0128/egos-2000), Cornell's 2,000-line teaching OS for RISC-V. It runs on QEMU and on RISC-V FPGA boards. I implemented the course projects below for the Operating Systems course (CSE231) at IIIT-Delhi. Everything after the divider is the original egos-2000 README.
+
+## What I implemented
+
+**Preemptive Multi-Level Feedback Queue scheduler** (`grass/process.c`, `grass/kernel.c`, `grass/process.h`)
+- 5 priority levels. Level *k* gets a runtime budget of (k+1) × 100 ms (`MLFQ_LEVEL_RUNTIME`).
+- On every timer interrupt the kernel charges the running process for its runtime. When the budget is used up, the process drops one level.
+- The scheduler always runs a process from the highest non-empty level.
+- Every 10 s (`MLFQ_RESET_PERIOD`) all processes are boosted back to level 0, so CPU-bound processes cannot starve.
+- When there is pending keyboard input, the shell is reset to level 0, so the system stays responsive while background loops run.
+- Per-process lifecycle statistics are printed when a process exits: turnaround time, response time, CPU time and number of timer interrupts.
+
+**User tools** (`apps/user/grep.c`, `apps/user/wcl.c`)
+- `grep`: substring matching over file contents with line-buffer management and argument validation.
+- `wcl`: line counting across files.
+
+```bash
+make && make qemu        # needs the RISC-V toolchain and QEMU, see USAGES.md
+> loop &                 # start CPU-bound background processes
+> loop &
+> ls                     # the shell stays responsive thanks to the keyboard boost
+```
+
+---
+
 ## Vision
 
 This project's vision is to help **every** student read **all** the code of a teaching operating system.
